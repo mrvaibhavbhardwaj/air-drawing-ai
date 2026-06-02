@@ -1,5 +1,5 @@
 """
-Hand tracking module using MediaPipe Hands.
+Hand tracking module using MediaPipe Hands (Tasks API).
 
 Wraps MediaPipe to detect hand landmarks, count raised fingers,
 and return the index fingertip position for air-drawing gestures.
@@ -7,23 +7,25 @@ and return the index fingertip position for air-drawing gestures.
 
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+import os
 
 import cv2
 import mediapipe as mp
-
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 
 @dataclass
 class HandState:
     """Snapshot of one detected hand used by the drawing app."""
-
     index_tip: Tuple[int, int]          # Pixel coords of index fingertip
     raised_finger_count: int            # Extended fingers (excluding thumb)
     is_drawing_gesture: bool            # Index only raised -> draw
     is_pause_gesture: bool              # Index + middle raised -> stop / select
+    is_eraser_gesture: bool             # Index + middle + ring raised -> erase
 
 
 class HandTracker:
-    """Real-time hand landmark detection via MediaPipe Hands."""
+    """Real-time hand landmark detection via MediaPipe Tasks."""
 
     def __init__(
         self,
@@ -31,13 +33,19 @@ class HandTracker:
         detection_confidence: float = 0.7,
         tracking_confidence: float = 0.6,
     ) -> None:
-        self._mp_hands = mp.solutions.hands
-        self._hands = self._mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=max_hands,
-            min_detection_confidence=detection_confidence,
+        model_path = os.path.join(os.path.dirname(__file__), 'hand_landmarker.task')
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+            
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.HandLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            num_hands=max_hands,
+            min_hand_detection_confidence=detection_confidence,
             min_tracking_confidence=tracking_confidence,
         )
+        self._landmarker = vision.HandLandmarker.create_from_options(options)
 
     def process(self, frame_bgr: Any) -> Optional[HandState]:
         """
@@ -45,35 +53,37 @@ class HandTracker:
 
         Returns HandState for the first detected hand, or None if no hand found.
         """
-        # MediaPipe expects RGB input.
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        frame_rgb.flags.writeable = False
-        results = self._hands.process(frame_rgb)
-        frame_rgb.flags.writeable = True
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        
+        results = self._landmarker.detect(mp_image)
 
-        if not results.multi_hand_landmarks:
+        if not results.hand_landmarks:
             return None
 
-        landmarks = results.multi_hand_landmarks[0]
+        # Take the first hand
+        landmarks = results.hand_landmarks[0]
         height, width = frame_bgr.shape[:2]
 
-        index_tip = self._landmark_to_pixel(landmarks.landmark[8], width, height)
+        index_tip = self._landmark_to_pixel(landmarks[8], width, height)
         fingers = self._finger_states(landmarks)
         raised_count = sum(fingers.values())
 
-        # Precise gestures: index-only draws, index+middle pauses for toolbar use.
         index_up = fingers["index"]
         middle_up = fingers["middle"]
-        others_down = not fingers["ring"] and not fingers["pinky"]
+        ring_up = fingers["ring"]
+        pinky_up = fingers["pinky"]
 
-        is_drawing = index_up and not middle_up and others_down
-        is_pause = index_up and middle_up and others_down
+        is_drawing = index_up and not middle_up and not ring_up and not pinky_up
+        is_pause = index_up and middle_up and not ring_up and not pinky_up
+        is_eraser = index_up and middle_up and ring_up and not pinky_up
 
         return HandState(
             index_tip=index_tip,
             raised_finger_count=raised_count,
             is_drawing_gesture=is_drawing,
             is_pause_gesture=is_pause,
+            is_eraser_gesture=is_eraser,
         )
 
     @staticmethod
@@ -86,13 +96,10 @@ class HandTracker:
     def _finger_states(self, landmarks: Any) -> dict:
         """
         Return whether index/middle/ring/pinky are extended.
-
-        Thumb is ignored because it often triggers accidentally during pointing.
+        Thumb is ignored.
         """
-        lm = landmarks.landmark
-
         def is_up(tip_idx: int, pip_idx: int) -> bool:
-            return lm[tip_idx].y < lm[pip_idx].y
+            return landmarks[tip_idx].y < landmarks[pip_idx].y
 
         return {
             "index": is_up(8, 6),
@@ -103,4 +110,4 @@ class HandTracker:
 
     def close(self) -> None:
         """Release MediaPipe resources."""
-        self._hands.close()
+        self._landmarker.close()

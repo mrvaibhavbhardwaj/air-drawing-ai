@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+hand_landmarker.task
+drawing.png

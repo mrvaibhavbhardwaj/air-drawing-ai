@@ -135,7 +135,8 @@ def on_mouse(event: int, x: int, y: int, flags: int, canvas: DrawingCanvas) -> N
 
 def main() -> None:
     camera = HighQualityCamera()
-    tracker = HandTracker()
+    # High confidence thresholds restrict bad landmarks which causes jitter
+    tracker = HandTracker(detection_confidence=0.8, tracking_confidence=0.85)
     canvas = DrawingCanvas(width=camera.width, height=camera.height)
     fps_counter = FPSCounter()
 
@@ -146,8 +147,9 @@ def main() -> None:
 
     print("Air Draw started.")
     print("  Hand: 1 finger = draw | 2 fingers = pause + point at toolbar")
+    print("  Hand: 3 fingers = eraser")
     print("  Mouse: click toolbar colors or Clear anytime")
-    print("  q / ESC = quit")
+    print("  Keys: s = save drawing | +/- = brush size | q/ESC = quit")
 
     while True:
         ok, frame = camera.read()
@@ -169,6 +171,12 @@ def main() -> None:
                 is_drawing = True
                 canvas.set_toolbar_hover(None)
                 canvas.add_stroke_point(tip)
+                
+            elif hand.is_eraser_gesture:
+                mode_label = "Mode: Eraser"
+                is_drawing = True
+                canvas.set_toolbar_hover(None)
+                canvas.add_stroke_point(tip, is_eraser=True)
 
             elif hand.is_pause_gesture:
                 mode_label = "Mode: Select"
@@ -181,7 +189,7 @@ def main() -> None:
                 canvas.end_stroke()
                 canvas.set_toolbar_hover(None)
 
-            canvas.draw_cursor(frame, tip, drawing=is_drawing)
+            canvas.draw_cursor(frame, tip, drawing=is_drawing, is_eraser=hand.is_eraser_gesture)
 
             if was_drawing and not is_drawing:
                 canvas.end_stroke()
@@ -206,7 +214,25 @@ def main() -> None:
 
         cv2.imshow(WINDOW_NAME, frame)
 
-        if (cv2.waitKey(1) & 0xFF) in (ord("q"), 27):
+        key = cv2.waitKey(1) & 0xFF
+        if key in (ord("q"), 27):
+            break
+        elif key == ord("s"):
+            cv2.imwrite("drawing.png", frame)
+            print("Canvas saved as drawing.png")
+            # Give some visual feedback
+            cv2.putText(frame, "SAVED!", (camera.width//2 - 60, camera.height//2), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+            cv2.imshow(WINDOW_NAME, frame)
+            cv2.waitKey(500)
+        elif key == ord("+") or key == ord("="):
+            canvas.brush_size = min(40, canvas.brush_size + 2)
+            print(f"Brush size: {canvas.brush_size}")
+        elif key == ord("-") or key == ord("_"):
+            canvas.brush_size = max(2, canvas.brush_size - 2)
+            print(f"Brush size: {canvas.brush_size}")
+        
+        # Break if the window is closed by the user
+        if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
             break
 
     camera.release()

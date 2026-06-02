@@ -7,8 +7,66 @@ Provides a virtual whiteboard layer composited on top of the webcam feed.
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
+import time
+import math
 import cv2
 import numpy as np
+
+
+class OneEuroFilter2D:
+    """One Euro Filter for 2D noisy signals (like hand tracking).
+    
+    Effectively eliminates jitter at low speeds (for precise writing) 
+    while preserving high responsiveness at high speeds.
+    """
+    def __init__(self, min_cutoff=0.5, beta=1.5, d_cutoff=1.0):
+        self.min_cutoff = min_cutoff
+        self.beta = beta
+        self.d_cutoff = d_cutoff
+        self.x_prev = None
+        self.y_prev = None
+        self.dx_prev = 0.0
+        self.dy_prev = 0.0
+        self.t_prev = 0.0
+
+    def __call__(self, x: int, y: int) -> Tuple[int, int]:
+        t = time.time()
+        if self.x_prev is None:
+            self.x_prev, self.y_prev = float(x), float(y)
+            self.t_prev = t
+            return x, y
+
+        t_e = t - self.t_prev
+        if t_e <= 0.0:
+            return int(self.x_prev), int(self.y_prev)
+
+        def smoothing_factor(te, cutoff):
+            r = 2 * math.pi * cutoff * te
+            return r / (r + 1)
+
+        # Filter the derivative (speed)
+        a_d = smoothing_factor(t_e, self.d_cutoff)
+        dx, dy = (x - self.x_prev) / t_e, (y - self.y_prev) / t_e
+        dx_hat = a_d * dx + (1 - a_d) * self.dx_prev
+        dy_hat = a_d * dy + (1 - a_d) * self.dy_prev
+
+        # Adjust cutoff dynamically based on speed
+        speed = math.sqrt(dx_hat**2 + dy_hat**2)
+        cutoff = self.min_cutoff + self.beta * speed
+
+        # Filter the signal (position)
+        a = smoothing_factor(t_e, cutoff)
+        x_hat = a * x + (1 - a) * self.x_prev
+        y_hat = a * y + (1 - a) * self.y_prev
+
+        self.x_prev, self.y_prev = x_hat, y_hat
+        self.dx_prev, self.dy_prev = dx_hat, dy_hat
+        self.t_prev = t
+
+        return int(x_hat), int(y_hat)
+
+    def reset(self):
+        self.x_prev = None
 
 
 # --- Layout constants for the modern whiteboard UI ---
@@ -43,15 +101,13 @@ class DrawingCanvas:
     width: int
     height: int
     brush_size: int = 6
-    smooth_window: int = 5
 
     canvas: np.ndarray = field(init=False)
     selected_color_index: int = 0
     colors: List[ColorOption] = field(default_factory=list)
     clear_button_rect: Tuple[int, int, int, int] = (0, 0, 0, 0)
 
-    # Smoothing buffer: recent fingertip positions for interpolated strokes.
-    _point_buffer: List[Tuple[int, int]] = field(default_factory=list, init=False)
+    _filter: OneEuroFilter2D = field(default_factory=OneEuroFilter2D, init=False)
     _last_draw_point: Optional[Tuple[int, int]] = field(default=None, init=False)
     _hover_index: int = field(default=-1, init=False)
     _clear_hovered: bool = field(default=False, init=False)
@@ -160,24 +216,18 @@ class DrawingCanvas:
     def clear(self) -> None:
         """Erase all strokes from the canvas."""
         self.canvas[:] = 0
-        self._point_buffer.clear()
+        self._filter.reset()
         self._last_draw_point = None
 
     def _smooth_point(self, point: Tuple[int, int]) -> Tuple[int, int]:
-        """Average recent fingertip positions to reduce jitter."""
-        self._point_buffer.append(point)
-        if len(self._point_buffer) > self.smooth_window:
-            self._point_buffer.pop(0)
+        """Apply One-Euro Filter to massively reduce jitter for writing."""
+        return self._filter(point[0], point[1])
 
-        xs = [p[0] for p in self._point_buffer]
-        ys = [p[1] for p in self._point_buffer]
-        return int(sum(xs) / len(xs)), int(sum(ys) / len(ys))
-
-    def add_stroke_point(self, point: Tuple[int, int]) -> None:
+    def add_stroke_point(self, point: Tuple[int, int], is_eraser: bool = False) -> None:
         """
         Add a smoothed stroke segment from the previous point to the new one.
-
         Uses anti-aliased lines for soft, modern-looking strokes.
+        If is_eraser is true, draws black to wipe out strokes.
         """
         if not self.is_in_drawing_area(point):
             return
@@ -185,12 +235,14 @@ class DrawingCanvas:
         smooth = self._smooth_point(point)
 
         if self._last_draw_point is not None:
+            color = (0, 0, 0) if is_eraser else self.current_color
+            thickness = self.brush_size * 8 if is_eraser else self.brush_size
             cv2.line(
                 self.canvas,
                 self._last_draw_point,
                 smooth,
-                self.current_color,
-                self.brush_size,
+                color,
+                thickness,
                 lineType=cv2.LINE_AA,
             )
 
@@ -198,7 +250,7 @@ class DrawingCanvas:
 
     def end_stroke(self) -> None:
         """Reset stroke state when the user lifts their drawing gesture."""
-        self._point_buffer.clear()
+        self._filter.reset()
         self._last_draw_point = None
 
     def draw_toolbar(self, frame: np.ndarray) -> None:
@@ -330,16 +382,51 @@ class DrawingCanvas:
             lineType=cv2.LINE_AA,
         )
 
+        # Draw creator credits on the bottom right
+        credits = [
+            "Created by: Vaibhav Bhardwaj",
+            "LinkedIn: www.linkedin.com/in/mr-vaibhav-bhardwaj",
+            "GitHub: github.com/mrvaibhavbhardwaj"
+        ]
+        
+        # Calculate bounding box for the credits
+        max_width = 380
+        credits_h = len(credits) * 20 + 10
+        credits_x = self.width - max_width - 10
+        credits_y = self.height - credits_h - 10
+        
+        # Draw translucent background for credits
+        credits_bg = frame.copy()
+        cv2.rectangle(credits_bg, (credits_x, credits_y), (self.width - 10, self.height - 10), (45, 42, 38), -1)
+        cv2.addWeighted(credits_bg, 0.75, frame, 0.25, 0, frame)
+        
+        # Add the text
+        for i, text in enumerate(credits):
+            cv2.putText(
+                frame,
+                text,
+                (credits_x + 10, credits_y + 20 + i * 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (230, 225, 220),
+                1,
+                lineType=cv2.LINE_AA,
+            )
+
     def draw_cursor(
         self,
         frame: np.ndarray,
         point: Tuple[int, int],
         drawing: bool,
+        is_eraser: bool = False,
     ) -> None:
         """Visual fingertip cursor — filled when drawing, ring when hovering."""
         color = self.current_color if drawing else (255, 255, 255)
-        if drawing:
+        if drawing and not is_eraser:
             cv2.circle(frame, point, 8, color, -1, lineType=cv2.LINE_AA)
+        elif is_eraser:
+            cv2.circle(frame, point, self.brush_size * 4, (100, 100, 255), 2, lineType=cv2.LINE_AA)
+            cv2.putText(frame, "Eraser", (point[0]+20, point[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 255), 1, cv2.LINE_AA)
         else:
             cv2.circle(frame, point, 10, color, 2, lineType=cv2.LINE_AA)
             cv2.circle(frame, point, 3, color, -1, lineType=cv2.LINE_AA)

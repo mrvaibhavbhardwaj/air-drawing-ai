@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Drawing AI - Canvas</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body class="app-body">
+    <div id="loading" class="loading-overlay glass">
+        <div class="spinner"></div>
+        <h2>Loading AI Models...</h2>
+        <p>Please grant camera permissions when prompted.</p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar glass">
+        <a href="index.html" class="back-btn">← Home</a>
+        <div class="colors" id="colors">
+            <!-- Populated by JS -->
+        </div>
+        
+        <div class="controls">
+            <span class="brush-size">Size: <span id="size-val">6</span>px (+/-)</span>
+            <button id="clear-btn" class="btn-secondary">Clear Canvas</button>
+            <button id="save-btn" class="btn-primary">Save Image</button>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <div class="status-bar glass">
+        <div id="mode-label">Mode: Initializing...</div>
+        <div class="watermark">Created by Vaibhav Bhardwaj</div>
+    </div>
+
+    <!-- MediaPipe Vision (imported via module in script.js) -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
