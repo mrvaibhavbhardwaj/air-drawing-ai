@@ -59,3 +59,19 @@ Through this project I explored:
 * Virtual classroom whiteboard features
 
 ---
+
+## Deploy to Cloudflare Pages
+
+1. Push this project to a Git provider (GitHub, GitLab, Bitbucket).
+2. Open Cloudflare Pages and create a new project.
+3. Connect the repository and select the `main` branch.
+4. Use these settings:
+   - Framework preset: `None`
+   - Build command: *(leave empty)*
+   - Build output directory: `.`
+5. If this repo is part of a larger repository, set the root directory to `air-drawing-ai`.
+6. Save and deploy.
+
+Your live site will serve `index.html` from the project root.
+
+> Note: The app page is available at `/app.html` once deployed.
