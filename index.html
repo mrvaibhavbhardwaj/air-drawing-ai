@@ -15,13 +15,76 @@
         <div class="blob blob-2"></div>
         <div class="blob blob-3"></div>
 
-        <header class="glass animate-fade-in-up">
-            <h1 class="glow-text">Air Drawing AI</h1>
-            <p class="subtitle">Paint in the air with your bare hands, powered by Computer Vision.</p>
-        </header>
-        
-        <main class="main-grid">
-            <div class="card glass animate-fade-in-up delay-1">
+        <div class="landing-topbar glass animate-fade-in-up">
+            <div class="brand">
+                <div class="brand-mark">✋</div>
+                <div>
+                    <p class="brand-label">Air Drawing AI</p>
+                    <p class="brand-tag">Gesture-driven canvas with MediaPipe</p>
+                </div>
+            </div>
+            <a href="app.html" class="btn-primary topbar-btn">Launch App</a>
+        </div>
+
+        <section class="hero-grid">
+            <div class="hero-copy glass animate-fade-in-up">
+                <p class="eyebrow">Interactive AI Drawing</p>
+                <h1>Bring your hands to life as a virtual paintbrush.</h1>
+                <p class="hero-text">Use your webcam to draw fluent strokes, select tools, and erase with simple finger gestures. No stylus, no click — just motion and imagination.</p>
+
+                <div class="hero-actions">
+                    <a href="app.html" class="btn-primary">Open the canvas</a>
+                    <a href="#features" class="btn-secondary">See features</a>
+                </div>
+
+                <div class="hero-highlights">
+                    <div class="highlight">
+                        <span>✔</span>
+                        <div>
+                            <strong>Realtime tracking</strong>
+                            <p>Low-latency hand detection in-browser.</p>
+                        </div>
+                    </div>
+                    <div class="highlight">
+                        <span>✔</span>
+                        <div>
+                            <strong>Gesture controls</strong>
+                            <p>Draw, pause, and erase with finger poses.</p>
+                        </div>
+                    </div>
+                    <div class="highlight">
+                        <span>✔</span>
+                        <div>
+                            <strong>No backend</strong>
+                            <p>All interaction happens locally in your browser.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="hero-preview glass animate-fade-in-up delay-1">
+                <div class="preview-label">Live preview</div>
+                <div class="preview-panel">
+                    <div class="preview-window">
+                        <div class="preview-topbar">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <div class="preview-stage">
+                            <div class="preview-canvas"></div>
+                            <div class="preview-gesture">
+                                <span>☝️ ✌️</span>
+                                <p>Move your index finger to draw, then switch gestures to pause or erase.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section id="features" class="main-grid">
+            <div class="card glass animate-fade-in-up delay-2">
                 <div class="card-icon">🎨</div>
                 <h2>About the Project</h2>
                 <p>Air Drawing AI is a real-time, browser-based hand tracking application. Using cutting-edge MediaPipe vision models and a custom One-Euro smoothing filter, it allows you to draw effortlessly on a virtual canvas—without touching your screen.</p>
@@ -32,7 +95,7 @@
                 </div>
             </div>
 
-            <div class="card glass author-card animate-fade-in-up delay-2">
+            <div class="card glass author-card animate-fade-in-up delay-3">
                 <div class="card-icon">👨‍💻</div>
                 <h2>Meet the Creator</h2>
                 <h3 class="author-name">Vaibhav Bhardwaj</h3>
@@ -50,13 +113,26 @@
                 </div>
             </div>
 
-            <div class="cta-container animate-fade-in-up delay-3">
+            <div class="stack-card glass animate-fade-in-up delay-4">
+                <div class="card-icon">⚡</div>
+                <h2>Tech & Experience</h2>
+                <p>Built with modern browser tooling, open-source vision models, and local webcam processing for instant interaction.</p>
+                <div class="stack-grid">
+                    <span>MediaPipe</span>
+                    <span>OpenCV</span>
+                    <span>Webcam API</span>
+                    <span>JavaScript</span>
+                    <span>Python</span>
+                </div>
+            </div>
+
+            <div class="cta-container animate-fade-in-up delay-5">
                 <a href="app.html" class="btn-primary">
                     <span class="btn-text">Launch App</span>
                     <span class="btn-icon">→</span>
                 </a>
             </div>
-        </main>
+        </section>
     </div>
 </body>
 </html>

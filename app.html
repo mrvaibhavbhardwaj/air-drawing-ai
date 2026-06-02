@@ -14,6 +14,17 @@
         <p>Please grant camera permissions when prompted.</p>
     </div>
 
+    <div id="error-overlay" class="error-overlay glass hidden">
+        <div class="error-card">
+            <h2>Something went wrong</h2>
+            <p id="error-message">An unexpected error occurred while loading the app.</p>
+            <div class="error-actions">
+                <button id="error-retry-btn" class="btn-primary">Retry</button>
+                <button id="error-close-btn" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toolbar -->
     <div class="toolbar glass">
         <a href="index.html" class="back-btn">← Home</a>

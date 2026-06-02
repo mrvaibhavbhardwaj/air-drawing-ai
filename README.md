@@ -59,14 +59,3 @@ Through this project I explored:
 * Virtual classroom whiteboard features
 
 ---
-
-## Author
-
-**Dikshu Grover**
-
-Aspiring AI Engineer passionate about Artificial Intelligence, Computer Vision, Automation, and building practical AI-powered applications.
-
-GitHub: https://github.com/Dikshu-Grover
-
-```
-```

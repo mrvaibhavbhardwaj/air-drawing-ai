@@ -1,13 +1,17 @@
 import {
     HandLandmarker,
     FilesetResolver
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
 
 // DOM Elements
 const video = document.getElementById("webcam");
 const canvasElement = document.getElementById("output_canvas");
 const canvasCtx = canvasElement.getContext("2d");
 const loading = document.getElementById("loading");
+const errorOverlay = document.getElementById("error-overlay");
+const errorMessage = document.getElementById("error-message");
+const errorRetryBtn = document.getElementById("error-retry-btn");
+const errorCloseBtn = document.getElementById("error-close-btn");
 const colorsContainer = document.getElementById("colors");
 const modeLabel = document.getElementById("mode-label");
 const sizeVal = document.getElementById("size-val");
@@ -104,22 +108,45 @@ async function initApp() {
             "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
         );
         
-        handLandmarker = await HandLandmarker.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-                delegate: "GPU"
-            },
-            runningMode: "VIDEO",
-            numHands: 1,
-            minHandDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
-        });
+        try {
+            handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO",
+                numHands: 1,
+                minHandDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
+            });
+        } catch (gpuError) {
+            console.warn("GPU delegate failed, falling back to CPU.", gpuError);
+            handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+                },
+                runningMode: "VIDEO",
+                numHands: 1,
+                minHandDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.7
+            });
+        }
 
         startCamera();
     } catch (e) {
         console.error(e);
-        alert("Failed to load AI models.");
+        showError("Failed to load AI models. Check browser console for more details.");
     }
+}
+
+function showError(message) {
+    loading.classList.add("hidden");
+    errorMessage.innerText = message;
+    errorOverlay.classList.remove("hidden");
+}
+
+function hideError() {
+    errorOverlay.classList.add("hidden");
 }
 
 function resizeCanvas() {
@@ -179,7 +206,8 @@ function startCamera() {
         video.addEventListener("loadeddata", predictWebcam);
         loading.classList.add("hidden");
     }).catch(err => {
-        alert("Camera access denied.");
+        console.error("Camera failed to start", err);
+        showError("Camera access denied or unavailable. Please allow camera permission and refresh the page.");
     });
 }
 
@@ -313,6 +341,16 @@ function drawCursor(x, y, isDrawing, isEraser) {
         cursorCtx.fill();
     }
 }
+
+errorRetryBtn.addEventListener("click", () => {
+    hideError();
+    loading.classList.remove("hidden");
+    initApp();
+});
+
+errorCloseBtn.addEventListener("click", () => {
+    hideError();
+});
 
 // Start
 initApp();

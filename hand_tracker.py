@@ -10,6 +10,7 @@ from typing import Any, Optional, Tuple
 import os
 
 import cv2
+import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -98,15 +99,36 @@ class HandTracker:
         Return whether index/middle/ring/pinky are extended.
         Thumb is ignored.
         """
-        def is_up(tip_idx: int, pip_idx: int) -> bool:
-            return landmarks[tip_idx].y < landmarks[pip_idx].y
+        wrist = landmarks[0]
+
+        def is_extended(tip_idx: int, pip_idx: int, mcp_idx: int) -> bool:
+            tip = landmarks[tip_idx]
+            pip = landmarks[pip_idx]
+            mcp = landmarks[mcp_idx]
+
+            tip_vec = np.array([tip.x - pip.x, tip.y - pip.y])
+            pip_vec = np.array([pip.x - mcp.x, pip.y - mcp.y])
+            if np.linalg.norm(tip_vec) < 1e-6 or np.linalg.norm(pip_vec) < 1e-6:
+                return False
+
+            cosine = np.dot(tip_vec, pip_vec) / (np.linalg.norm(tip_vec) * np.linalg.norm(pip_vec))
+            is_straight = cosine > 0.55
+            is_farther_from_wrist = self._distance_to_wrist(tip, wrist) > self._distance_to_wrist(pip, wrist)
+
+            return is_straight and is_farther_from_wrist
 
         return {
-            "index": is_up(8, 6),
-            "middle": is_up(12, 10),
-            "ring": is_up(16, 14),
-            "pinky": is_up(20, 18),
+            "index": is_extended(8, 6, 5),
+            "middle": is_extended(12, 10, 9),
+            "ring": is_extended(16, 14, 13),
+            "pinky": is_extended(20, 18, 17),
         }
+
+    @staticmethod
+    def _distance_to_wrist(landmark: Any, wrist: Any) -> float:
+        dx = landmark.x - wrist.x
+        dy = landmark.y - wrist.y
+        return np.hypot(dx, dy)
 
     def close(self) -> None:
         """Release MediaPipe resources."""
